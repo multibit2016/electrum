@@ -257,12 +257,12 @@ class PaymentAttemptFailureDetails(NamedTuple):
 
 class PaymentAttemptLog(NamedTuple):
     success: bool
-    route: Optional['LNPaymentRoute'] = None
     preimage: Optional[bytes] = None
     failure_details: Optional[PaymentAttemptFailureDetails] = None
     exception: Optional[Exception] = None
 
     def formatted_tuple(self):
+        return 'N/A', 'N/A', 'N/A'
         if not self.exception:
             route = self.route
             route_str = '%d'%len(route)
@@ -288,11 +288,34 @@ class PaymentAttemptLog(NamedTuple):
         return route_str, chan_str, message
 
 
-class BarePaymentAttemptLog(NamedTuple):
+class HtlcLog(NamedTuple):
     success: bool
+    amount_msat: int
+    route: Optional['LNPaymentRoute'] = None
     preimage: Optional[bytes] = None
     error_bytes: Optional[bytes] = None
-    failure_message: Optional['OnionRoutingFailureMessage'] = None
+    failure_msg: Optional['OnionRoutingFailureMessage'] = None
+    sender_idx: Optional[int] = None
+
+    def formatted_tuple(self):
+        route = self.route
+        route_str = '%d'%len(route)
+        short_channel_id = None
+        if not self.success:
+            sender_idx = self.sender_idx
+            failure_msg = self.failure_msg
+            if sender_idx is not None:
+                try:
+                    short_channel_id = route[sender_idx + 1].short_channel_id
+                except IndexError:
+                    # payment destination reported error
+                    short_channel_id = _("Destination node")
+            message = failure_msg.code_name()
+        else:
+            short_channel_id = route[-1].short_channel_id
+            message = _('Success')
+        chan_str = str(short_channel_id) if short_channel_id else _("Unknown")
+        return route_str, chan_str, message
 
 
 class LightningError(Exception): pass
