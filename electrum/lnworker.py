@@ -1007,7 +1007,7 @@ class LNWallet(LNWorker):
             if len(log) >= attempts:
                 # give up
                 break
-            if htlc_log.sender_idx:
+            if htlc_log.sender_idx is not None:
                 # apply channel update here
                 should_continue = self.handle_error_code_from_failed_htlc(htlc_log)
                 if not should_continue:
