@@ -971,14 +971,13 @@ class LNWallet(LNWorker):
 
         # initially, try with less htlcs
         amount_to_pay = lnaddr.get_amount_msat()
-        amount_sent = 0      # what we sent in htlcs
-        amount_received = 0  # what the recipient received
+        amount_inflight = 0      # what we sent in htlcs
 
         self.set_invoice_status(key, PR_INFLIGHT)
         util.trigger_callback('invoice_status', self.wallet, key)
 
         while True:
-            amount_to_send = amount_to_pay - amount_sent
+            amount_to_send = amount_to_pay - amount_inflight
             if amount_to_send > 0:
                 # 1. create a set of routes for remaining amount
                 # note: path-finding runs in a separate thread so that we don't block the asyncio loop
@@ -993,18 +992,15 @@ class LNWallet(LNWorker):
                 # 2. send htlcs
                 for route, amount_msat in routes:
                     await self.pay_to_route(route, amount_msat, lnaddr)
-                    amount_sent += amount_msat
+                    amount_inflight += amount_msat
                 util.trigger_callback('invoice_status', self.wallet, key)
             # 3. await a queue
             htlc_log = await self.pending_sent_htlcs[payment_hash].get()
+            amount_inflight -= htlc_log.amount_msat
             log.append(htlc_log)
             if htlc_log.success:
-                amount_received += htlc_log.amount_msat
-                if amount_received >= amount_to_pay:
-                    success = True
-                    break
-                else:
-                    continue
+                success = True
+                break
             # htlc failed
             # if we get a tmp channel failure, it might work to split the amount and try more routes
             # if we get a channel update, we might retry the same route and amount
